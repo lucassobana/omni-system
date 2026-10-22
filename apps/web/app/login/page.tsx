@@ -18,7 +18,7 @@ import { Suspense } from "react";
 // ─── Formulário interno (precisa de useSearchParams → Suspense boundary) ──
 function LoginForm() {
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirectTo") ?? "/app";
+  const redirectTo = searchParams.get("redirectTo") ?? "/dashboard";
 
   const [state, formAction, isPending] = useActionState(loginAction, {
     error: null,

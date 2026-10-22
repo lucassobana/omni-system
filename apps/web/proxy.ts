@@ -3,8 +3,9 @@ import { createServerClient } from "@supabase/ssr";
 
 // ─── Rotas públicas ────────────────────────────────────────────────────────
 // Rotas que NÃO requerem autenticação.
+// ─── Rotas públicas ────────────────────────────────────────────────────────
+// Rotas que NÃO requerem autenticação (recursos estáticos, login e cadastro).
 const PUBLIC_ROUTES = [
-  "/",
   "/login",
   "/cadastro",
   "/api/seed",
@@ -20,26 +21,6 @@ const MEMBER_ROUTES  = /^\/app(\/.*)?$/;
 
 /**
  * Middleware do Next.js — proxy de autenticação e autorização.
- *
- * Responsabilidades:
- * 1. Renovar o token de sessão Supabase (via getClaims).
- * 2. Redirecionar usuários não autenticados para /login.
- * 3. Redirecionar usuários autenticados para a área correta de acordo
- *    com sua role (member → /app, owner/admin → /dashboard).
- *
- * FLUXO:
- *   Request chegando
- *     ↓
- *   Rota pública? → passa direto
- *     ↓
- *   Não autenticado? → /login
- *     ↓
- *   Busca role do usuário em profiles
- *     ↓
- *   member acessando /dashboard → /app
- *   owner/admin acessando /app  → /dashboard
- *     ↓
- *   Acesso permitido → continua
  */
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -54,7 +35,6 @@ export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
   // ── 2. Cria o client Supabase para o middleware ────────────────────────
-  // IMPORTANTE: criar sempre uma nova instância por request.
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
@@ -82,27 +62,38 @@ export async function proxy(request: NextRequest) {
   );
 
   // ── 3. Renova o token (DEVE ser chamado antes de qualquer redirect) ────
-  // getClaims() valida o JWT localmente e o renova se necessário.
-  // Não usar getSession() — não valida o token.
   const { data: claims } = await supabase.auth.getClaims();
   const isAuthenticated = !!claims?.claims;
 
-  // ── 4. Rotas públicas: deixa passar sem verificação de role ───────────
+  // ── 4. Rota raiz "/": redireciona para /dashboard ou /login ────────────
+  if (pathname === "/") {
+    const targetUrl = request.nextUrl.clone();
+    targetUrl.pathname = isAuthenticated ? "/dashboard" : "/login";
+    targetUrl.searchParams.delete("redirectTo");
+    return NextResponse.redirect(targetUrl);
+  }
+
+  // ── 5. Se já está logado e tenta acessar /login → vai para o dashboard ───
+  if (pathname === "/login" && isAuthenticated) {
+    const dashUrl = request.nextUrl.clone();
+    dashUrl.pathname = "/dashboard";
+    dashUrl.searchParams.delete("redirectTo");
+    return NextResponse.redirect(dashUrl);
+  }
+
+  // ── 6. Rotas públicas: deixa passar sem verificação de role ───────────
   const isPublicRoute = PUBLIC_ROUTES.some(
     (route) => pathname === route || pathname.startsWith(`${route}/`)
   );
 
   if (isPublicRoute) {
-    // Se já está logado e tenta acessar /login → redireciona para a área correta
-    // (será tratado no próximo request pelo middleware — aqui apenas deixamos passar)
     return supabaseResponse;
   }
 
-  // ── 5. Não autenticado tentando rota privada → /login ─────────────────
+  // ── 7. Não autenticado tentando rota privada → /login ─────────────────
   if (!isAuthenticated) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
-    // Preserva o destino original para redirecionar após login
     loginUrl.searchParams.set("redirectTo", pathname);
     return NextResponse.redirect(loginUrl);
   }

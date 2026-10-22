@@ -21,7 +21,7 @@ export async function loginAction(
 ): Promise<{ error: string | null }> {
   const email = formData.get("email")?.toString().trim() ?? "";
   const password = formData.get("password")?.toString() ?? "";
-  const redirectTo = formData.get("redirectTo")?.toString() ?? "/app";
+  const redirectTo = formData.get("redirectTo")?.toString() || "/dashboard";
 
   // Validação básica no servidor (a UI também valida, mas server-side é obrigatório)
   if (!email || !password) {
