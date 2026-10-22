@@ -150,8 +150,12 @@ export class TimeCalculationService {
 
     let scheduledHours: number | null = null;
     if (shifts && shifts.length > 0 && shifts[0]?.schedules) {
-      const sched = shifts[0].schedules;
-      scheduledHours = Array.isArray(sched) ? sched[0]?.shift_hours : sched.shift_hours;
+      const rawSched = shifts[0].schedules as unknown;
+      if (Array.isArray(rawSched)) {
+        scheduledHours = (rawSched[0] as { shift_hours?: number } | undefined)?.shift_hours ?? null;
+      } else if (rawSched && typeof rawSched === "object" && "shift_hours" in rawSched) {
+        scheduledHours = (rawSched as { shift_hours: number }).shift_hours;
+      }
     }
 
     if (!plannedHours) {

@@ -8,3 +8,6 @@ build/
 .DS_Store
 .vercel
 .env*
+!.env.example
+supabase/.temp/
+supabase/.branches/
